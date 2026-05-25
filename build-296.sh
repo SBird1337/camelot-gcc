@@ -27,8 +27,8 @@ fi
 
 NPROC="$(nproc 2>/dev/null || echo 4)"
 
-HOST_CFLAGS="-O2 -fno-pie -no-pie -Wno-narrowing -Wno-implicit-int -Wno-implicit-function-declaration -Wno-pointer-arith -Wno-int-conversion -Wno-format -Wno-error -fcommon"
-HOST_CXXFLAGS="-O2 -fno-pie -no-pie -Wno-narrowing -Wno-error"
+HOST_CFLAGS="-O2 -fno-pie -no-pie -Wno-narrowing -Wno-implicit-int -Wno-implicit-function-declaration -Wno-pointer-arith -Wno-int-conversion -Wno-format -Wno-error -fcommon -std=gnu17 -Wno-incompatible-pointer-types"
+HOST_CXXFLAGS="-O2 -fno-pie -no-pie -Wno-narrowing -Wno-error -std=gnu++17"
 HOST_LDFLAGS="-no-pie"
 
 # `-fcommon` required for gcc-10+ host (default flipped to -fno-common in 10).
@@ -91,9 +91,19 @@ fi
 # --- Stage 4: build cc1 directly (skip make all-gcc; fixinc collides) ---
 if [ ! -x gcc/cc1 ] || [ ! -x gcc/xgcc ] || [ ! -x gcc/cpp ] || [ ! -x gcc/tradcpp ]; then
   echo "[4/4] make cc1 + xgcc + cpp + tradcpp"
+  
+  find "$SRC" -name configure.in -exec touch -t 200001010000.00 {} \;
+
+  touch "$BUILD/gcc/config.status"
+
+  find "$SRC/gcc" -name "*.y" | while read _y; do
+    _c="${_y%.y}.c"; [ -f "$_c" ] && touch "$_c"
+  done
+  touch "$SRC/gcc/c-gperf.h"
   cd gcc
-  CFLAGS="$HOST_CFLAGS" CXXFLAGS="$HOST_CXXFLAGS" LDFLAGS="$HOST_LDFLAGS" \
-    make -j"$NPROC" cc1 xgcc cpp tradcpp
+  make -j"$NPROC" \
+    CFLAGS="$HOST_CFLAGS" CXXFLAGS="$HOST_CXXFLAGS" LDFLAGS="$HOST_LDFLAGS" \
+    cc1 xgcc cpp tradcpp
   cd ..
 fi
 
