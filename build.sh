@@ -23,8 +23,8 @@ NPROC="$(nproc 2>/dev/null || echo 4)"
 # Conservative host flags: gcc-11 emits warnings that gcc-3.0 source treats as
 # errors without these silencers. -no-pie is required because gcc-3.0's
 # build infrastructure produces non-PIE executables.
-HOST_CFLAGS="-O2 -fno-pie -no-pie -Wno-narrowing -Wno-implicit-int -Wno-implicit-function-declaration -Wno-pointer-arith -Wno-int-conversion -Wno-format -Wno-error"
-HOST_CXXFLAGS="-O2 -fno-pie -no-pie -Wno-narrowing -Wno-error"
+HOST_CFLAGS="-O2 -fno-pie -no-pie -Wno-narrowing -Wno-implicit-int -Wno-implicit-function-declaration -Wno-pointer-arith -Wno-int-conversion -Wno-format -Wno-error -std=gnu17 -Wno-incompatible-pointer-types"
+HOST_CXXFLAGS="-O2 -fno-pie -no-pie -Wno-narrowing -Wno-error -std=gnu++17"
 HOST_LDFLAGS="-no-pie"
 
 # Some configure / install helpers lose +x via Windows-side editing / archive
@@ -86,8 +86,18 @@ fi
 # We use ||true and verify artifacts directly below.
 if [ ! -x gcc/cc1 ] || [ ! -x gcc/xgcc ] || [ ! -x gcc/cpp0 ] || [ ! -x gcc/tradcpp0 ]; then
   echo "[4/4] make all-gcc (libgcc tail is expected to fail; host artifacts land first)"
-  CFLAGS="$HOST_CFLAGS" CXXFLAGS="$HOST_CXXFLAGS" LDFLAGS="$HOST_LDFLAGS" \
-    make all-gcc -j"$NPROC" || true
+  find "$SRC" -name configure.in -exec touch -t 200001010000.00 {} \;
+  touch "$BUILD/gcc/config.status"
+  find "$SRC/gcc" -name "*.y" | while read _y; do
+    _c="${_y%.y}.c"; [ -f "$_c" ] && touch "$_c"
+  done
+
+  cd gcc
+  make -j"$NPROC" \
+    CFLAGS="$HOST_CFLAGS" CXXFLAGS="$HOST_CXXFLAGS" LDFLAGS="$HOST_LDFLAGS" \
+    BISON=true \
+    cc1 xgcc cpp0 tradcpp0
+  cd ..
 fi
 
 echo
